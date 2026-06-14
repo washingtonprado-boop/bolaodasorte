@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Bolão da Copa</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    body { background: #f8fafc; }
+    .admin-wrap { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    .admin-header {
+      background: linear-gradient(90deg, #003087, #006633);
+      color: #fff; padding: 1rem 1.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .admin-header h1 { font-size: 1.1rem; }
+
+    .tabs-admin {
+      display: flex; gap: 0; border-bottom: 2px solid #e5e7eb;
+      background: #fff; margin-bottom: 1.5rem;
+    }
+    .tab-admin {
+      padding: .7rem 1.25rem; border: none; border-bottom: 3px solid transparent;
+      background: none; cursor: pointer; font-size: .9rem; font-weight: 500;
+      color: #6b7280; transition: all .2s; margin-bottom: -2px;
+    }
+    .tab-admin.ativo { color: #006633; border-bottom-color: #006633; }
+
+    .painel-admin { display: none; }
+    .painel-admin.ativo { display: block; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width:600px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .lista-admin-jogos .item-admin {
+      background: #fff; border: 1px solid #e5e7eb;
+      border-radius: 10px; padding: .9rem 1.1rem;
+      margin-bottom: .6rem; display: flex;
+      align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: .5rem;
+    }
+    .item-admin .nomes-times { font-weight: 700; }
+    .item-admin .data-jogo   { font-size: .8rem; color: #6b7280; }
+    .item-admin .acoes       { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+    .btn-sm {
+      padding: .35rem .75rem; border-radius: 6px; font-size: .82rem;
+      font-weight: 600; cursor: pointer; border: 1.5px solid;
+      transition: all .2s;
+    }
+    .btn-resultado { background: #f0fdf4; color: #065f46; border-color: #86efac; }
+    .btn-resultado:hover { background: #dcfce7; }
+    .btn-apagar   { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+    .btn-apagar:hover { background: #fee2e2; }
+
+    .resultado-atual {
+      font-size: .82rem; font-weight: 700; color: #065f46;
+      background: #d1fae5; padding: 2px 8px; border-radius: 20px;
+    }
+
+    .lista-users .item-user {
+      background: #fff; border: 1px solid #e5e7eb;
+      border-radius: 10px; padding: .8rem 1rem;
+      margin-bottom: .5rem; display: flex;
+      align-items: center; gap: 1rem; flex-wrap: wrap;
+    }
+    .item-user .user-info  { flex: 1; }
+    .item-user .user-nome  { font-weight: 700; }
+    .item-user .user-email { font-size: .82rem; color: #6b7280; }
+    .item-user .user-pts   { font-size: .88rem; color: #006633; font-weight: 700; }
+
+    .toggle-pago {
+      padding: .35rem .85rem; border-radius: 20px; font-size: .78rem;
+      font-weight: 700; cursor: pointer; border: none; transition: all .2s;
+    }
+    .pago     { background: #d1fae5; color: #065f46; }
+    .pendente { background: #fee2e2; color: #991b1b; }
+
+    .msg-sucesso {
+      background: #d1fae5; color: #065f46; padding: .6rem .9rem;
+      border-radius: 8px; font-size: .88rem; margin-top: .75rem;
+      border: 1px solid #86efac; display: none;
+    }
+
+    .stat-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: .75rem; margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: #fff; border-radius: 10px; border: 1px solid #e5e7eb;
+      padding: 1rem; text-align: center;
+    }
+    .stat-card .stat-valor { font-size: 1.8rem; font-weight: 800; color: #006633; }
+    .stat-card .stat-label { font-size: .78rem; color: #6b7280; margin-top: .2rem; }
+
+    input[type="datetime-local"] { font-size: .9rem; }
+    .form-inline-resultado {
+      display: none; background: #f0faf4; border: 1px solid #86efac;
+      border-radius: 8px; padding: .85rem 1rem; margin-top: .5rem;
+    }
+    .form-inline-resultado.aberto { display: block; }
+    .placar-inline {
+      display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem;
+    }
+    .placar-inline input {
+      width: 60px; text-align: center; font-size: 1.2rem; font-weight: 700;
+      padding: .35rem; border: 1.5px solid #86efac; border-radius: 7px;
+    }
+    .placar-inline span { font-weight: 700; color: #6b7280; }
+
+    .alerta-admin {
+      background: #fffbea; border: 1px solid #fcd34d;
+      border-radius: 8px; padding: .75rem 1rem; font-size: .85rem;
+      color: #92400e; margin-bottom: 1rem;
+    }
+  </style>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+    import {
+      getAuth, onAuthStateChanged, signOut
+    } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+    import {
+      getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc,
+      updateDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp, writeBatch
+    } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+    // ─── CONFIG ─────────────────────────────────────────────────────────────
+    const FIREBASE_CONFIG = {
+      apiKey:            "AIzaSyDy3qfKSLGSELH3Xf1_fB_p3ZZDeX5TSEY",
+      authDomain:        "boloes-615d5.firebaseapp.com",
+      projectId:         "boloes-615d5",
+      storageBucket:     "boloes-615d5.firebasestorage.app",
+      messagingSenderId: "874157018430",
+      appId:             "1:874157018430:web:c38ee7490a37a004a8b06f"
+    };
+
+    const ADMIN_EMAIL   = "washington_fernandes1@hotmail.com";
+    const PONTOS        = { placarExato: 10, vencedorMaisUmGol: 6, soVencedor: 3, empateAcertado: 3 };
+    const VALOR_COTA    = 10.00;
+
+    const app  = initializeApp(FIREBASE_CONFIG);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    const $ = id => document.getElementById(id);
+    const fmtData = ts => {
+      if (!ts) return '—';
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      return d.toLocaleString('pt-BR', { dateStyle:'short', timeStyle:'short' });
+    };
+    const fmtMoeda = v => v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+
+    // ─── AUTH GUARD ───────────────────────────────────────────────────────────
+    onAuthStateChanged(auth, user => {
+      if (!user) { window.location.href = '../index.html'; return; }
+      if (user.email !== ADMIN_EMAIL) {
+        alert('Acesso negado. Apenas o administrador pode acessar esta área.');
+        window.location.href = '../index.html';
+        return;
+      }
+      $('admin-email').textContent = user.email;
+      iniciarAdmin();
+    });
+
+    $('btn-sair').addEventListener('click', () => signOut(auth).then(() => window.location.href = '../index.html'));
+
+    // ─── TABS ─────────────────────────────────────────────────────────────────
+    document.querySelectorAll('.tab-admin').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-admin').forEach(b => b.classList.remove('ativo'));
+        document.querySelectorAll('.painel-admin').forEach(p => p.classList.remove('ativo'));
+        btn.classList.add('ativo');
+        $('painel-' + btn.dataset.painel).classList.add('ativo');
+        if (btn.dataset.painel === 'jogos')    carregarJogos();
+        if (btn.dataset.painel === 'usuarios') carregarUsuarios();
+        if (btn.dataset.painel === 'dashboard') carregarDashboard();
+      });
+    });
+
+    // ─── INIT ─────────────────────────────────────────────────────────────────
+    function iniciarAdmin() {
+      carregarDashboard();
+      setupFormJogo();
+    }
+
+    // ─── DASHBOARD ────────────────────────────────────────────────────────────
+    async function carregarDashboard() {
+      const [jogosSnap, usersSnap, palpsSnap] = await Promise.all([
+        getDocs(collection(db, 'jogos')),
+        getDocs(collection(db, 'users')),
+        getDocs(collection(db, 'palpites'))
+      ]);
+
+      const jogos   = jogosSnap.docs.map(d => d.data());
+      const users   = usersSnap.docs.map(d => d.data());
+      const pagos   = users.filter(u => u.pagou).length;
+
+      $('stat-jogos').textContent       = jogos.length;
+      $('stat-encerrados').textContent  = jogos.filter(j => j.resultado).length;
+      $('stat-usuarios').textContent    = users.length;
+      $('stat-palpites').textContent    = palpsSnap.size;
+      $('stat-arrecadado').textContent  = fmtMoeda(pagos * VALOR_COTA);
+      $('stat-pagos').textContent       = `${pagos}/${users.length} pagos`;
+
+      // Ranking top 5
+      const ranking = [...users].sort((a, b) => (b.pontos||0) - (a.pontos||0)).slice(0,5);
+      $('top5-ranking').innerHTML = ranking.map((u, i) => `
+        <tr>
+          <td style="font-weight:700">${i+1}º</td>
+          <td>${u.nome || u.email}</td>
+          <td style="font-weight:700;color:#006633">${u.pontos||0} pts</td>
+          <td>${u.pagou ? '<span class="resultado-atual">Pago</span>' : '<span style="font-size:.75rem;color:#991b1b">Pendente</span>'}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ─── JOGOS ────────────────────────────────────────────────────────────────
+    function setupFormJogo() {
+      $('form-novo-jogo').addEventListener('submit', async e => {
+        e.preventDefault();
+        const dados = {
+          timeA:     $('jogo-timeA').value.trim(),
+          bandeiraA: $('jogo-bandA').value.trim() || '🏳',
+          timeB:     $('jogo-timeB').value.trim(),
+          bandeiraB: $('jogo-bandB').value.trim() || '🏳',
+          grupo:     $('jogo-grupo').value.trim(),
+          rodada:    $('jogo-rodada').value,
+          dataHora:  new Date($('jogo-data').value),
+          criadoEm:  serverTimestamp(),
+          resultado:  null
+        };
+        await addDoc(collection(db, 'jogos'), dados);
+        e.target.reset();
+        mostrarMsgSucesso('msg-jogo', 'Jogo adicionado com sucesso!');
+        carregarJogos();
+      });
+    }
+
+    async function carregarJogos() {
+      const cont = $('lista-jogos-admin');
+      cont.innerHTML = '<p class="carregando">Carregando...</p>';
+      const snap = await getDocs(query(collection(db, 'jogos'), orderBy('dataHora', 'asc')));
+      if (!snap.size) { cont.innerHTML = '<p class="vazio">Nenhum jogo cadastrado.</p>'; return; }
+      cont.innerHTML = '';
+      snap.docs.forEach(d => {
+        const jogo = { id: d.id, ...d.data() };
+        cont.appendChild(criarItemJogo(jogo));
+      });
+    }
+
+    function criarItemJogo(jogo) {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `
+        <div class="item-admin" id="item-${jogo.id}">
+          <div>
+            <div class="nomes-times">${jogo.bandeiraA} ${jogo.timeA} × ${jogo.timeB} ${jogo.bandeiraB}</div>
+            <div class="data-jogo">${fmtData(jogo.dataHora)} · ${jogo.rodada || ''} · ${jogo.grupo || ''}</div>
+            ${jogo.resultado
+              ? `<span class="resultado-atual">✓ ${jogo.resultado.golsA} × ${jogo.resultado.golsB}</span>`
+              : ''}
+          </div>
+          <div class="acoes">
+            <button class="btn-sm btn-resultado" onclick="toggleFormResultado('${jogo.id}')">
+              ${jogo.resultado ? '✎ Editar resultado' : '⚽ Registrar resultado'}
+            </button>
+            <button class="btn-sm btn-apagar" onclick="apagarJogo('${jogo.id}')">Apagar</button>
+          </div>
+        </div>
+        <div class="form-inline-resultado" id="form-res-${jogo.id}">
+          <strong style="font-size:.85rem;display:block;margin-bottom:.5rem;">${jogo.timeA} × ${jogo.timeB} — Resultado final</strong>
+          <div class="placar-inline">
+            <span style="font-size:.85rem;color:#374151">${jogo.timeA}</span>
+            <input type="number" min="0" max="30" value="${jogo.resultado?.golsA ?? ''}" id="res-a-${jogo.id}">
+            <span>×</span>
+            <input type="number" min="0" max="30" value="${jogo.resultado?.golsB ?? ''}" id="res-b-${jogo.id}">
+            <span style="font-size:.85rem;color:#374151">${jogo.timeB}</span>
+          </div>
+          <button class="btn-sm btn-resultado" onclick="salvarResultado('${jogo.id}', '${jogo.timeA}', '${jogo.timeB}')">
+            Confirmar resultado e calcular pontos
+          </button>
+          <p style="font-size:.78rem;color:#6b7280;margin-top:.5rem">
+            ⚠ Isso irá calcular e atribuir pontos a todos os participantes.
+          </p>
+        </div>
+      `;
+      return wrap;
+    }
+
+    window.toggleFormResultado = id => {
+      const form = $(`form-res-${id}`);
+      form.classList.toggle('aberto');
+    };
+
+    window.salvarResultado = async (jogoId, timeA, timeB) => {
+      const ga = parseInt($(`res-a-${jogoId}`).value);
+      const gb = parseInt($(`res-b-${jogoId}`).value);
+      if (isNaN(ga) || isNaN(gb)) return alert('Preencha o placar completo.');
+      if (!confirm(`Confirmar resultado: ${timeA} ${ga} × ${gb} ${timeB}?\n\nIsso vai calcular pontos de todos os participantes.`)) return;
+
+      const resultado = { golsA: ga, golsB: gb, registradoEm: serverTimestamp() };
+      await updateDoc(doc(db, 'jogos', jogoId), { resultado });
+
+      // Calcular pontos de todos
+      await calcularPontosJogo(jogoId, resultado);
+      alert('Resultado registrado e pontos calculados!');
+      carregarJogos();
+    };
+
+    async function calcularPontosJogo(jogoId, resultado) {
+      const palpsSnap = await getDocs(
+        query(collection(db, 'palpites'))
+      );
+      const batch = writeBatch(db);
+
+      const acertos = {};
+      palpsSnap.docs.forEach(d => {
+        const p = d.data();
+        if (p.jogoId !== jogoId) return;
+        const pts = calcPts(p, resultado);
+        // Atualiza o palpite com pontuação
+        batch.update(d.ref, { pontosGanhos: pts });
+        acertos[p.userId] = (acertos[p.userId] || 0) + pts;
+      });
+      await batch.commit();
+
+      // Atualiza pontos nos usuários
+      const batch2 = writeBatch(db);
+      for (const [uid, pts] of Object.entries(acertos)) {
+        const uSnap = await getDoc(doc(db, 'users', uid));
+        const atual = (uSnap.data()?.pontos || 0);
+        batch2.update(doc(db, 'users', uid), { pontos: atual + pts });
+      }
+      await batch2.commit();
+    }
+
+    function calcPts(palpite, resultado) {
+      const [ga, gb] = [parseInt(palpite.golsA), parseInt(palpite.golsB)];
+      const [ra, rb] = [parseInt(resultado.golsA), parseInt(resultado.golsB)];
+      if (ga === ra && gb === rb) return PONTOS.placarExato;
+      const rv = ra > rb ? 'A' : rb > ra ? 'B' : 'E';
+      const pv = ga > gb ? 'A' : gb > ga ? 'B' : 'E';
+      if (rv !== pv) return 0;
+      if (rv === 'E') return PONTOS.empateAcertado;
+      if (ga === ra || gb === rb) return PONTOS.vencedorMaisUmGol;
+      return PONTOS.soVencedor;
+    }
+
+    window.apagarJogo = async id => {
+      if (!confirm('Apagar este jogo? Esta ação não pode ser desfeita.')) return;
+      await deleteDoc(doc(db, 'jogos', id));
+      carregarJogos();
+    };
+
+    // ─── USUÁRIOS ─────────────────────────────────────────────────────────────
+    async function carregarUsuarios() {
+      const cont = $('lista-usuarios');
+      cont.innerHTML = '<p class="carregando">Carregando usuários...</p>';
+      const snap = await getDocs(query(collection(db, 'users'), orderBy('pontos', 'desc')));
+      if (!snap.size) { cont.innerHTML = '<p class="vazio">Nenhum usuário.</p>'; return; }
+      cont.innerHTML = '';
+
+      snap.docs.forEach(d => {
+        const u = { id: d.id, ...d.data() };
+        const item = document.createElement('div');
+        item.className = 'lista-users';
+        item.innerHTML = `
+          <div class="item-user">
+            <div class="user-info">
+              <div class="user-nome">${u.nome || '—'}</div>
+              <div class="user-email">${u.email}</div>
+            </div>
+            <div class="user-pts">${u.pontos || 0} pts</div>
+            <button
+              class="toggle-pago ${u.pagou ? 'pago' : 'pendente'}"
+              onclick="togglePagamento('${u.id}', ${!u.pagou})"
+            >${u.pagou ? '✓ Pago' : 'Pendente'}</button>
+          </div>
+        `;
+        cont.appendChild(item);
+      });
+    }
+
+    window.togglePagamento = async (uid, novoPagou) => {
+      await updateDoc(doc(db, 'users', uid), { pagou: novoPagou });
+      carregarUsuarios();
+      carregarDashboard();
+    };
+
+    // ─── UI HELPERS ───────────────────────────────────────────────────────────
+    function mostrarMsgSucesso(id, msg) {
+      const el = $(id);
+      if (!el) return;
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 3000);
+    }
+  </script>
+</head>
+<body>
+
+<header class="admin-header">
+  <h1>⚙ Painel Admin — Bolão da Copa</h1>
+  <div style="display:flex;align-items:center;gap:.75rem;font-size:.85rem">
+    <span id="admin-email"></span>
+    <button id="btn-sair" class="btn-ghost">Sair</button>
+  </div>
+</header>
+
+<div class="admin-wrap">
+
+  <div class="alerta-admin">
+    ⚠ Área restrita ao administrador. Todas as ações são permanentes.
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-admin">
+    <button class="tab-admin ativo" data-painel="dashboard">📊 Dashboard</button>
+    <button class="tab-admin" data-painel="jogos">⚽ Jogos</button>
+    <button class="tab-admin" data-painel="usuarios">👥 Participantes</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="painel-dashboard" class="painel-admin ativo">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-valor" id="stat-jogos">—</div>
+        <div class="stat-label">Jogos cadastrados</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-valor" id="stat-encerrados">—</div>
+        <div class="stat-label">Jogos encerrados</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-valor" id="stat-usuarios">—</div>
+        <div class="stat-label">Participantes</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-valor" id="stat-palpites">—</div>
+        <div class="stat-label">Palpites feitos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-valor" id="stat-arrecadado" style="font-size:1.2rem">—</div>
+        <div class="stat-label">Total arrecadado</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-valor" id="stat-pagos" style="font-size:1.1rem">—</div>
+        <div class="stat-label">Status pagamentos</div>
+      </div>
+    </div>
+
+    <h3 style="font-size:1rem;font-weight:700;color:#006633;margin-bottom:.75rem">Top 5 classificação atual</h3>
+    <table class="tabela-ranking" style="max-width:500px">
+      <thead><tr><th>#</th><th>Participante</th><th>Pontos</th><th>Cota</th></tr></thead>
+      <tbody id="top5-ranking"></tbody>
+    </table>
+  </div>
+
+  <!-- Jogos -->
+  <div id="painel-jogos" class="painel-admin">
+    <div class="grid-2">
+      <!-- Form novo jogo -->
+      <div class="form-admin">
+        <h3>➕ Adicionar novo jogo</h3>
+        <form id="form-novo-jogo">
+          <label>Time A</label>
+          <div style="display:flex;gap:.5rem">
+            <input id="jogo-bandA" type="text" placeholder="🇧🇷" style="width:60px">
+            <input id="jogo-timeA" type="text" required placeholder="Brasil">
+          </div>
+          <label>Time B</label>
+          <div style="display:flex;gap:.5rem">
+            <input id="jogo-bandB" type="text" placeholder="🇦🇷" style="width:60px">
+            <input id="jogo-timeB" type="text" required placeholder="Argentina">
+          </div>
+          <label>Rodada</label>
+          <select id="jogo-rodada">
+            <option>Fase de Grupos</option>
+            <option>Oitavas de Final</option>
+            <option>Quartas de Final</option>
+            <option>Semifinal</option>
+            <option>Terceiro Lugar</option>
+            <option>Final</option>
+          </select>
+          <label>Grupo (opcional)</label>
+          <input id="jogo-grupo" type="text" placeholder="Grupo A">
+          <label>Data e hora do jogo</label>
+          <input id="jogo-data" type="datetime-local" required>
+          <button type="submit" class="btn-primario">Adicionar jogo</button>
+          <div id="msg-jogo" class="msg-sucesso"></div>
+        </form>
+      </div>
+
+      <!-- Regras de pontuação (referência visual) -->
+      <div class="form-admin">
+        <h3>📋 Regras de pontuação</h3>
+        <table style="width:100%;font-size:.88rem;border-collapse:collapse">
+          <tr style="border-bottom:1px solid #e5e7eb">
+            <td style="padding:.5rem 0">Placar exato</td>
+            <td style="font-weight:800;color:#006633;text-align:right">10 pts</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e5e7eb">
+            <td style="padding:.5rem 0">Vencedor + gols de 1 time</td>
+            <td style="font-weight:800;color:#0f766e;text-align:right">6 pts</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e5e7eb">
+            <td style="padding:.5rem 0">Só o vencedor / empate certo</td>
+            <td style="font-weight:800;color:#d97706;text-align:right">3 pts</td>
+          </tr>
+          <tr>
+            <td style="padding:.5rem 0">Errou tudo</td>
+            <td style="font-weight:800;color:#dc2626;text-align:right">0 pts</td>
+          </tr>
+        </table>
+        <div style="margin-top:1rem;font-size:.82rem;color:#6b7280">
+          <p>⏰ Palpites são fechados automaticamente 60 minutos antes de cada jogo.</p>
+          <p style="margin-top:.4rem">🔁 Ao registrar um resultado, o sistema recalcula os pontos de todos os participantes automaticamente.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-size:1rem;font-weight:700;color:#006633;margin:1.25rem 0 .75rem">Lista de jogos</h3>
+    <div id="lista-jogos-admin" class="lista-admin-jogos"></div>
+  </div>
+
+  <!-- Usuários -->
+  <div id="painel-usuarios" class="painel-admin">
+    <p style="font-size:.85rem;color:#6b7280;margin-bottom:1rem">
+      Clique no botão ao lado de cada participante para confirmar/reverter o pagamento da cota.
+    </p>
+    <div id="lista-usuarios"></div>
+  </div>
+
+</div>
+</body>
+</html>
