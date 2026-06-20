@@ -162,6 +162,10 @@ footer{text-align:center;padding:20px;font-size:.72rem;color:var(--cinza);}
 .mesa-valor{font-size:1.7rem;font-weight:900;color:#fff;margin:4px 0;}
 .mesa-valor.mesa-premio{color:var(--amarelo);}
 .mesa-sub{font-size:.68rem;color:#d4f4dd;}
+.mesa-rifa-aviso{
+  margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.2);
+  text-align:center;font-size:.74rem;color:#fffbea;
+}
 
 /* Preview de ganho */
 .preview-ganho{margin:10px 0;}
@@ -187,6 +191,72 @@ footer{text-align:center;padding:20px;font-size:.72rem;color:var(--cinza);}
 .lp-num{color:var(--cinza);font-weight:700;font-size:.75rem;}
 .lp-placar{font-weight:800;color:var(--azul);}
 .lp-nome{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* Popup de ganho */
+.popup-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0);
+  display:flex;align-items:center;justify-content:center;
+  z-index:1000;padding:20px;pointer-events:none;
+  transition:background .25s;
+}
+.popup-overlay.show{background:rgba(0,0,0,.55);pointer-events:auto;}
+.popup-box{
+  background:#fff;border-radius:16px;padding:26px 22px;
+  max-width:340px;width:100%;text-align:center;position:relative;
+  transform:scale(.85);opacity:0;transition:.25s;
+  box-shadow:0 10px 40px rgba(0,0,0,.3);
+}
+.popup-overlay.show .popup-box{transform:scale(1);opacity:1;}
+.popup-fechar{
+  position:absolute;top:10px;right:12px;background:none;border:none;
+  font-size:1.1rem;color:var(--cinza);cursor:pointer;width:28px;height:28px;
+}
+.popup-emoji{font-size:2.2rem;margin-bottom:4px;}
+.popup-titulo{font-size:.88rem;color:var(--cinza);font-weight:600;}
+.popup-ganho-valor{font-size:2.4rem;font-weight:900;color:var(--verde);margin:6px 0 2px;}
+.popup-sub{font-size:.78rem;color:var(--cinza);margin-bottom:16px;}
+.popup-detalhe{
+  background:#f7f8fa;border-radius:10px;padding:12px 14px;
+  text-align:left;margin-bottom:12px;
+}
+.popup-linha{
+  display:flex;justify-content:space-between;font-size:.78rem;
+  padding:4px 0;color:var(--texto);
+}
+.popup-linha span:last-child{font-weight:700;}
+.popup-aviso{font-size:.7rem;color:var(--cinza);line-height:1.4;}
+
+/* Preview de bandeira no formulário admin */
+.bandeira-preview{
+  display:flex;align-items:center;gap:8px;margin:6px 0 10px;
+  font-size:.74rem;color:var(--cinza);min-height:24px;
+}
+.bandeira-preview img{width:32px;height:auto;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+
+/* Painel de confirmação rápida de pagamento */
+.pendente-card{
+  border:1.5px solid #ffe49a;background:#fffdf6;
+  border-radius:10px;padding:12px;margin-bottom:10px;
+}
+.pendente-nome{font-weight:800;font-size:.95rem;}
+.pendente-tel{font-size:.78rem;color:var(--cinza);margin-bottom:2px;}
+.pendente-acoes{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+.btn-confirmar-grande{
+  background:var(--verde);color:#fff;border:none;
+  padding:14px;border-radius:8px;font-size:.95rem;font-weight:800;
+  cursor:pointer;letter-spacing:.3px;width:100%;
+}
+.btn-confirmar-grande:active{transform:scale(.98);}
+.pendente-acoes-sec{display:flex;gap:8px;}
+.btn-whats{
+  flex:1;text-align:center;background:#25d366;color:#fff;
+  text-decoration:none;padding:8px;border-radius:6px;
+  font-size:.78rem;font-weight:700;
+}
+.pendente-acoes-sec .btn-remover-palpite{
+  background:none;border:1px solid #f0c0c0;color:var(--vermelho);
+  cursor:pointer;font-size:.75rem;padding:8px 12px;border-radius:6px;
+}
 </style>
 </head>
 <body>
@@ -256,6 +326,33 @@ function imagemTime(j, lado){
   const pais = lado==='A' ? j.paisA : j.paisB;
   return bandeiraUrl(pais || 'br');
 }
+
+/* Dicionário de seleções/países mais comuns em bolão, pra identificação automática da bandeira */
+const PAISES_CODIGO = {
+  'brasil':'br','argentina':'ar','alemanha':'de','frança':'fr','franca':'fr',
+  'espanha':'es','portugal':'pt','italia':'it','itália':'it','inglaterra':'gb-eng',
+  'holanda':'nl','paises baixos':'nl','países baixos':'nl','belgica':'be','bélgica':'be',
+  'uruguai':'uy','chile':'cl','colombia':'co','colômbia':'co','mexico':'mx','méxico':'mx',
+  'estados unidos':'us','eua':'us','canada':'ca','canadá':'ca','japao':'jp','japão':'jp',
+  'coreia do sul':'kr','coreia':'kr','australia':'au','austrália':'au','marrocos':'ma',
+  'senegal':'sn','gana':'gh','camaroes':'cm','camarões':'cm','nigeria':'ng','nigéria':'ng',
+  'tunisia':'tn','tunísia':'tn','egito':'eg','arabia saudita':'sa','arábia saudita':'sa',
+  'qatar':'qa','catar':'qa','irã':'ir','ira':'ir','iraque':'iq','china':'cn','russia':'ru',
+  'rússia':'ru','ucrania':'ua','ucrânia':'ua','polonia':'pl','polônia':'pl','suica':'ch',
+  'suíça':'ch','suecia':'se','suécia':'se','noruega':'no','dinamarca':'dk','escocia':'gb-sct',
+  'escócia':'gb-sct','irlanda':'ie','croacia':'hr','croácia':'hr','servia':'rs','sérvia':'rs',
+  'paraguai':'py','peru':'pe','equador':'ec','bolivia':'bo','bolívia':'bo','venezuela':'ve',
+  'costa rica':'cr','panama':'pa','panamá':'pa','jamaica':'jm','india':'in','índia':'in',
+  'turquia':'tr','grecia':'gr','grécia':'gr','austria':'at','áustria':'at','romenia':'ro',
+  'romênia':'ro','hungria':'hu','islandia':'is','islândia':'is','gales':'gb-wls',
+  'africa do sul':'za','áfrica do sul':'za','costa do marfim':'ci','mali':'ml','argelia':'dz',
+  'argélia':'dz'
+};
+function identificarCodigoPais(nomeTime){
+  if(!nomeTime) return '';
+  const chave = nomeTime.trim().toLowerCase();
+  return PAISES_CODIGO[chave] || '';
+}
 function fmtData(iso){
   if(!iso) return '';
   const d = new Date(iso+'T00:00:00');
@@ -283,9 +380,43 @@ db.ref('jogos').on('value', snap=>{
   render();
 });
 db.ref('palpites').on('value', snap=>{
-  palpitesCache = snap.val() || {};
+  const novoCache = snap.val() || {};
+  detectarNovoPendente(palpitesCache, novoCache);
+  palpitesCache = novoCache;
   render();
 });
+
+let primeiroCarregamentoPalpites = true;
+function detectarNovoPendente(antigo, novo){
+  if(primeiroCarregamentoPalpites){
+    primeiroCarregamentoPalpites = false;
+    return; // não notifica no carregamento inicial da página
+  }
+  if(!adminLogado) return;
+  const idsAntigos = new Set(Object.keys(antigo||{}));
+  const idsNovos = Object.keys(novo||{});
+  const recemChegados = idsNovos.filter(id=>!idsAntigos.has(id) && !novo[id].pago);
+  if(recemChegados.length>0){
+    notificarNovoPendente(novo[recemChegados[0]]);
+  }
+}
+function notificarNovoPendente(palpite){
+  toast(`🔔 Novo palpite de ${palpite.nome} aguardando confirmação!`);
+  if(navigator.vibrate) navigator.vibrate([100,50,100]);
+  tocarBeep();
+}
+function tocarBeep(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine'; osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.4);
+    osc.start(); osc.stop(ctx.currentTime+0.4);
+  }catch(e){}
+}
 
 /* ===================== RENDER PRINCIPAL ===================== */
 function render(){
@@ -397,6 +528,7 @@ function renderDetalheJogo(id){
         <span class="mesa-sub">20% fica com a organização</span>
       </div>
     </div>
+    <div class="mesa-rifa-aviso">🎟️ Se ninguém acertar o palpite, o dinheiro será sorteado entre os participantes.</div>
   </div>
 
   ${resultadoHtml}
@@ -420,7 +552,6 @@ function renderDetalheJogo(id){
       <input type="number" min="0" id="palpiteB" placeholder="0">
       <span style="font-weight:700;font-size:.8rem">${j.timeB}</span>
     </div>
-    <div id="previewGanho" class="preview-ganho"></div>
     <button class="btn btn-primary" id="btnEnviarPalpite">Confirmar palpite</button>
   </div>` : ''}
 
@@ -482,12 +613,34 @@ function bindEvents(){
   const btnCriarJogo = document.getElementById('btnCriarJogo');
   if(btnCriarJogo) btnCriarJogo.onclick = criarJogo;
 
+  const novoTimeA = document.getElementById('novoTimeA');
+  const novoTimeB = document.getElementById('novoTimeB');
+  if(novoTimeA) novoTimeA.addEventListener('input', ()=>autoIdentificarBandeira('A'));
+  if(novoTimeB) novoTimeB.addEventListener('input', ()=>autoIdentificarBandeira('B'));
+  const novoPaisA = document.getElementById('novoPaisA');
+  const novoPaisB = document.getElementById('novoPaisB');
+  const novoImagemA = document.getElementById('novoImagemA');
+  const novoImagemB = document.getElementById('novoImagemB');
+  if(novoPaisA) novoPaisA.addEventListener('input', ()=>atualizarPreviewBandeira('A'));
+  if(novoPaisB) novoPaisB.addEventListener('input', ()=>atualizarPreviewBandeira('B'));
+  if(novoImagemA) novoImagemA.addEventListener('input', ()=>atualizarPreviewBandeira('A'));
+  if(novoImagemB) novoImagemB.addEventListener('input', ()=>atualizarPreviewBandeira('B'));
+
   document.querySelectorAll('.btn-confirmar-pgto').forEach(b=>{
     b.onclick = ()=> confirmarPagamento(b.dataset.id);
   });
   document.querySelectorAll('.btn-remover-palpite').forEach(b=>{
     b.onclick = ()=> removerPalpite(b.dataset.id);
   });
+
+  const buscaPendentes = document.getElementById('buscaPendentes');
+  if(buscaPendentes){
+    // mantém o foco e a posição do cursor ao re-renderizar enquanto digita
+    const pos = buscaPendentes.selectionStart;
+    buscaPendentes.focus();
+    buscaPendentes.setSelectionRange(pos, pos);
+    buscaPendentes.oninput = ()=>{ adminTabAtual='pagamentos'; render(); };
+  }
   document.querySelectorAll('.btn-lancar-resultado').forEach(b=>{
     b.onclick = ()=> lancarResultado(b.dataset.jogo);
   });
@@ -502,30 +655,62 @@ function bindEvents(){
   });
 }
 
+let timeoutPreviewGanho = null;
 function atualizarPreviewGanho(jogoId){
-  const j = jogosCache[jogoId];
-  const div = document.getElementById('previewGanho');
-  if(!j || !div) return;
   const a = document.getElementById('palpiteA').value;
   const b = document.getElementById('palpiteB').value;
-  if(a==='' || b===''){ div.innerHTML=''; return; }
+  clearTimeout(timeoutPreviewGanho);
+  if(a==='' || b===''){ fecharPopupGanho(); return; }
+  // pequeno debounce pra não abrir popup a cada tecla, só quando a pessoa pausa de digitar
+  timeoutPreviewGanho = setTimeout(()=> mostrarPopupGanho(jogoId, a, b), 450);
+}
+
+function mostrarPopupGanho(jogoId, a, b){
+  const j = jogosCache[jogoId];
+  if(!j) return;
 
   const pagos = Object.entries(palpitesCache).filter(([_,p])=>p.jogoId===jogoId && p.pago);
   const arrecadado = pagos.length * j.valor;
-  const premioTotal = arrecadado * (1-TAXA_ADMIN);
 
   // quantos JÁ pagaram com esse mesmo placar (sem contar você ainda, já que você nem pagou)
   const concorrentes = pagos.filter(([_,p])=>p.placarA===parseInt(a) && p.placarB===parseInt(b)).length;
   const totalSeVoceEntrar = concorrentes + 1; // você entraria nessa disputa
-  const premioComVoce = (arrecadado + j.valor) * (1-TAXA_ADMIN);
+  const arrecadadoComVoce = arrecadado + j.valor;
+  const taxaOrganizacao = arrecadadoComVoce * TAXA_ADMIN;
+  const premioComVoce = arrecadadoComVoce - taxaOrganizacao;
   const seuGanho = premioComVoce / totalSeVoceEntrar;
 
-  div.innerHTML = `
-    <div class="preview-box">
-      💡 Se <strong>${a} x ${b}</strong> for o placar final e você pagar, 
-      ${concorrentes>0 ? `vai dividir com mais ${concorrentes} pessoa(s) que já apostaram nesse placar` : 'você seria o único com esse palpite até agora'}: 
-      você ganharia <strong class="preview-valor">${formatBRL(seuGanho)}</strong>
+  let popup = document.getElementById('popupGanho');
+  if(!popup){
+    popup = document.createElement('div');
+    popup.id = 'popupGanho';
+    popup.className = 'popup-overlay';
+    document.body.appendChild(popup);
+    popup.onclick = (e)=>{ if(e.target===popup) fecharPopupGanho(); };
+  }
+  popup.innerHTML = `
+    <div class="popup-box">
+      <button class="popup-fechar" id="btnFecharPopupGanho">✕</button>
+      <div class="popup-emoji">💰</div>
+      <div class="popup-titulo">Se o placar for ${a} x ${b}...</div>
+      <div class="popup-ganho-valor">${formatBRL(seuGanho)}</div>
+      <div class="popup-sub">é o que você ganharia</div>
+      <div class="popup-detalhe">
+        <div class="popup-linha"><span>Mesa total (com você)</span><span>${formatBRL(arrecadadoComVoce)}</span></div>
+        <div class="popup-linha"><span>Taxa da organização (20%)</span><span>− ${formatBRL(taxaOrganizacao)}</span></div>
+        <div class="popup-linha"><span>Prêmio a dividir</span><span>${formatBRL(premioComVoce)}</span></div>
+        <div class="popup-linha"><span>Concorrendo com esse placar</span><span>${totalSeVoceEntrar} pessoa${totalSeVoceEntrar>1?'s':''}</span></div>
+      </div>
+      <div class="popup-aviso">⚠️ Esse valor é calculado com base em quem já pagou até agora. Pode mudar até o fim das apostas.</div>
+      <div class="popup-aviso popup-aviso-rifa">🎟️ Se ninguém acertar o palpite, o dinheiro será sorteado entre os participantes.</div>
     </div>`;
+  popup.classList.add('show');
+  document.getElementById('btnFecharPopupGanho').onclick = fecharPopupGanho;
+}
+
+function fecharPopupGanho(){
+  const popup = document.getElementById('popupGanho');
+  if(popup) popup.classList.remove('show');
 }
 
 function enviarPalpite(){
@@ -536,6 +721,7 @@ function enviarPalpite(){
 
   if(!nome || !telefone){ toast('Preencha nome e telefone'); return; }
   if(placarA==='' || placarB===''){ toast('Preencha o placar do seu palpite'); return; }
+  fecharPopupGanho();
 
   const novo = {
     jogoId: jogoSelecionado,
@@ -568,6 +754,7 @@ function mostrarPix(){
       </div>
     </div>
     <p style="font-size:.8rem;color:var(--cinza)">Depois de pagar, envie o comprovante para o organizador confirmar. Você pode acompanhar o status em "Meus Palpites".</p>
+    <p style="font-size:.78rem;color:var(--cinza);margin-top:8px">🎟️ Se ninguém acertar o palpite, o dinheiro será sorteado entre os participantes.</p>
     <button class="btn btn-primary" id="btnVoltarAposPix" style="margin-top:14px">OK, entendi</button>
   </div>`;
   document.getElementById('btnVoltarAposPix').onclick = ()=>{ jogoSelecionado=null; render(); };
@@ -656,12 +843,20 @@ function renderAdminNovoJogo(){
   return `
   <div class="card">
     <h3 style="margin-bottom:12px;font-size:1rem">Criar novo jogo</h3>
-    <div class="field"><label>Nome do time A</label><input type="text" id="novoTimeA" placeholder="Ex: Brasil"></div>
-    <div class="field"><label>Código do país A (ISO 2 letras, ex: br)</label><input type="text" id="novoPaisA" placeholder="br" maxlength="2"></div>
-    <div class="field"><label>URL da imagem/bandeira A (opcional, sobrepõe o código acima)</label><input type="text" id="novoImagemA" placeholder="https://..."></div>
-    <div class="field"><label>Nome do time B</label><input type="text" id="novoTimeB" placeholder="Ex: Alemanha"></div>
-    <div class="field"><label>Código do país B (ISO 2 letras, ex: de)</label><input type="text" id="novoPaisB" placeholder="de" maxlength="2"></div>
-    <div class="field"><label>URL da imagem/bandeira B (opcional, sobrepõe o código acima)</label><input type="text" id="novoImagemB" placeholder="https://..."></div>
+    <div class="field">
+      <label>Nome do time A</label>
+      <input type="text" id="novoTimeA" placeholder="Ex: Brasil">
+      <div class="bandeira-preview" id="previewBandeiraA"></div>
+    </div>
+    <div class="field"><label>Código do país A (preenchido automático, edite se precisar)</label><input type="text" id="novoPaisA" placeholder="br" maxlength="2"></div>
+    <div class="field"><label>URL da imagem A (opcional — use se a bandeira automática não servir)</label><input type="text" id="novoImagemA" placeholder="https://..."></div>
+    <div class="field">
+      <label>Nome do time B</label>
+      <input type="text" id="novoTimeB" placeholder="Ex: Alemanha">
+      <div class="bandeira-preview" id="previewBandeiraB"></div>
+    </div>
+    <div class="field"><label>Código do país B (preenchido automático, edite se precisar)</label><input type="text" id="novoPaisB" placeholder="de" maxlength="2"></div>
+    <div class="field"><label>URL da imagem B (opcional — use se a bandeira automática não servir)</label><input type="text" id="novoImagemB" placeholder="https://..."></div>
     <div class="field"><label>Valor da aposta (R$)</label><input type="number" step="0.01" id="novoValor" placeholder="3.00"></div>
     <div class="field"><label>Data do jogo</label><input type="date" id="novoData"></div>
     <button class="btn btn-primary" id="btnCriarJogo">Criar jogo</button>
@@ -679,6 +874,29 @@ function renderAdminNovoJogo(){
         </div>`).join('')}
   </div>
   `;
+}
+
+function autoIdentificarBandeira(lado){
+  const nomeInput = document.getElementById('novoTime'+lado);
+  const paisInput = document.getElementById('novoPais'+lado);
+  if(!nomeInput || !paisInput) return;
+  const codigo = identificarCodigoPais(nomeInput.value);
+  if(codigo){
+    paisInput.value = codigo;
+  }
+  atualizarPreviewBandeira(lado);
+}
+
+function atualizarPreviewBandeira(lado){
+  const preview = document.getElementById('previewBandeira'+lado);
+  if(!preview) return;
+  const imagemInput = document.getElementById('novoImagem'+lado);
+  const paisInput = document.getElementById('novoPais'+lado);
+  const urlCustom = imagemInput ? imagemInput.value.trim() : '';
+  const codigo = paisInput ? paisInput.value.trim() : '';
+  const url = urlCustom || (codigo ? bandeiraUrl(codigo) : '');
+  if(!url){ preview.innerHTML=''; return; }
+  preview.innerHTML = `<img src="${url}" alt="preview" onerror="this.style.display='none'"> <span>${urlCustom?'imagem customizada':'bandeira identificada: '+codigo.toUpperCase()}</span>`;
 }
 
 function criarJogo(){
@@ -728,23 +946,39 @@ function excluirJogo(id){
 }
 
 function renderAdminPagamentos(){
-  const pendentes = Object.entries(palpitesCache).filter(([_,p])=>!p.pago);
-  const pagos = Object.entries(palpitesCache).filter(([_,p])=>p.pago);
+  const termoBusca = (document.getElementById('buscaPendentes')?.value || '').toLowerCase().trim();
+  let pendentes = Object.entries(palpitesCache).filter(([_,p])=>!p.pago);
+  pendentes = pendentes.sort((a,b)=>(b[1].criadoEm||0)-(a[1].criadoEm||0)); // mais recente primeiro
+  if(termoBusca){
+    pendentes = pendentes.filter(([_,p])=>
+      p.nome.toLowerCase().includes(termoBusca) || p.telefone.includes(termoBusca));
+  }
+  const pagos = Object.entries(palpitesCache).filter(([_,p])=>p.pago).sort((a,b)=>(b[1].criadoEm||0)-(a[1].criadoEm||0));
   return `
+  <div class="card">
+    <input type="text" id="buscaPendentes" placeholder="🔎 Buscar por nome ou telefone..." value="${termoBusca}">
+  </div>
   <div class="card">
     <h3 style="margin-bottom:8px;font-size:1rem">⏳ Pendentes de confirmação (${pendentes.length})</h3>
     ${pendentes.length===0 ? '<div class="empty">Nenhum pagamento pendente.</div>' :
       pendentes.map(([id,p])=>{
         const j = jogosCache[p.jogoId];
+        const valor = j ? formatBRL(j.valor) : '';
+        const msgWhats = encodeURIComponent(`Oi ${p.nome}! Confirmamos seu pagamento do bolão (${j?`${j.timeA} x ${j.timeB}`:''} — palpite ${p.placarA}x${p.placarB}). Boa sorte! ⚽`);
+        const telLimpo = p.telefone.replace(/\D/g,'');
         return `
-        <div class="palpite-item">
-          <div>
-            <div><strong>${p.nome}</strong> — ${p.telefone}</div>
-            <div class="small-text">${j?`${j.timeA} x ${j.timeB}`:'(jogo removido)'} — Palpite: ${p.placarA}x${p.placarB} — ${j?formatBRL(j.valor):''}</div>
+        <div class="pendente-card">
+          <div class="pendente-info">
+            <div class="pendente-nome">${p.nome}</div>
+            <div class="pendente-tel">${p.telefone}</div>
+            <div class="small-text">${j?`${j.timeA} x ${j.timeB}`:'(jogo removido)'} — Palpite: <strong>${p.placarA}x${p.placarB}</strong> — ${valor}</div>
           </div>
-          <div style="display:flex;gap:6px">
-            <button class="btn-confirmar-pgto" data-id="${id}" style="background:var(--verde);color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer">Confirmar</button>
-            <button class="btn-remover-palpite" data-id="${id}" style="background:none;border:none;color:var(--vermelho);cursor:pointer;font-size:.75rem">✕</button>
+          <div class="pendente-acoes">
+            <button class="btn-confirmar-pgto btn-confirmar-grande" data-id="${id}">✓ CONFIRMAR PIX</button>
+            <div class="pendente-acoes-sec">
+              <a href="https://wa.me/55${telLimpo}?text=${msgWhats}" target="_blank" class="btn-whats">WhatsApp</a>
+              <button class="btn-remover-palpite" data-id="${id}">remover</button>
+            </div>
           </div>
         </div>`;
       }).join('')}
@@ -764,7 +998,10 @@ function renderAdminPagamentos(){
 }
 
 function confirmarPagamento(id){
-  db.ref('palpites/'+id+'/pago').set(true).then(()=>toast('Pagamento confirmado!'));
+  db.ref('palpites/'+id+'/pago').set(true).then(()=>{
+    toast('✓ Pix confirmado!');
+    if(navigator.vibrate) navigator.vibrate(80);
+  });
 }
 function removerPalpite(id){
   if(!confirm('Remover este palpite?')) return;
