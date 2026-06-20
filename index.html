@@ -87,6 +87,25 @@ main{max-width:780px;margin:0 auto;padding:16px;}
 }
 .badge.aberto{background:#d4f4dd;color:var(--verde);}
 .badge.encerrado{background:#fde2e1;color:var(--vermelho);}
+
+/* Contagem regressiva */
+.mini-contagem{
+  text-align:center;margin-top:8px;padding-top:8px;
+  border-top:1px dashed #e0e3e8;font-size:.78rem;font-weight:700;
+  color:var(--vermelho);
+}
+.contagem-card{
+  text-align:center;background:#fff8f7;border:1.5px solid #ffd4d1;
+}
+.contagem-aviso{
+  font-size:.76rem;font-weight:700;color:var(--vermelho);
+  margin-bottom:8px;line-height:1.4;
+}
+.contagem-numero{
+  font-size:2.1rem;font-weight:900;color:var(--vermelho);
+  letter-spacing:1px;font-variant-numeric:tabular-nums;
+}
+.contagem-sub{font-size:.74rem;color:var(--cinza);margin-top:2px;}
 .valor{font-weight:800;color:var(--verde);font-size:.95rem;}
 input,select{
   width:100%;padding:11px;border:1.5px solid #e0e3e8;
@@ -358,6 +377,28 @@ function fmtData(iso){
   const d = new Date(iso+'T00:00:00');
   return d.toLocaleDateString('pt-BR');
 }
+function dataHoraJogo(j){
+  // Combina data + hora do jogo num timestamp. Jogos antigos sem 'hora' caem à meia-noite.
+  const hora = j.hora || '00:00';
+  return new Date(`${j.data}T${hora}:00`);
+}
+function tempoRestanteMs(j){
+  return dataHoraJogo(j).getTime() - Date.now();
+}
+function jogoFechadoPorTempo(j){
+  return tempoRestanteMs(j) <= 0;
+}
+function fmtContagem(ms){
+  if(ms<=0) return '00:00:00';
+  const totalSeg = Math.floor(ms/1000);
+  const dias = Math.floor(totalSeg/86400);
+  const horas = Math.floor((totalSeg%86400)/3600);
+  const min = Math.floor((totalSeg%3600)/60);
+  const seg = totalSeg%60;
+  const pad = n=>String(n).padStart(2,'0');
+  if(dias>0) return `${dias}d ${pad(horas)}:${pad(min)}:${pad(seg)}`;
+  return `${pad(horas)}:${pad(min)}:${pad(seg)}`;
+}
 
 /* ===================== NAVEGAÇÃO ===================== */
 document.getElementById('navMenu').addEventListener('click', e=>{
@@ -433,13 +474,22 @@ function render(){
 
 /* ===================== LISTA DE JOGOS (PÚBLICO) ===================== */
 function renderListaJogos(){
-  const ids = Object.keys(jogosCache).sort((a,b)=> (jogosCache[b].criadoEm||0)-(jogosCache[a].criadoEm||0));
+  // Ordena por data+hora do jogo: mais próximo primeiro. Jogos já encerrados vão pro final, mais recentes primeiro entre eles.
+  const ids = Object.keys(jogosCache).sort((a,b)=>{
+    const ja = jogosCache[a], jb = jogosCache[b];
+    const aEncerrado = ja.status==='encerrado', bEncerrado = jb.status==='encerrado';
+    if(aEncerrado !== bEncerrado) return aEncerrado ? 1 : -1; // abertos primeiro
+    if(aEncerrado && bEncerrado) return (jb.criadoEm||0)-(ja.criadoEm||0);
+    return dataHoraJogo(ja).getTime() - dataHoraJogo(jb).getTime();
+  });
   if(ids.length===0){
     return `<div class="empty">Nenhum jogo cadastrado ainda.<br>Volte em breve! ⚽</div>`;
   }
   return ids.map(id=>{
     const j = jogosCache[id];
-    const aberto = j.status !== 'encerrado';
+    const fechadoPorTempo = jogoFechadoPorTempo(j);
+    const aberto = j.status !== 'encerrado' && !fechadoPorTempo;
+    const restante = tempoRestanteMs(j);
     return `
     <div class="card jogo-card" data-jogo="${id}">
       <div class="placar-row">
@@ -451,14 +501,26 @@ function renderListaJogos(){
       </div>
       <div class="meta-row">
         <span class="valor">${formatBRL(j.valor)}</span>
-        <span>${fmtData(j.data)}</span>
-        <span class="badge ${aberto?'aberto':'encerrado'}">${aberto?'Aberto':'Encerrado'}</span>
+        <span>${fmtData(j.data)} ${j.hora||''}</span>
+        <span class="badge ${aberto?'aberto':'encerrado'}">${j.status==='encerrado'?'Encerrado':(fechadoPorTempo?'Fechado p/ apostas':'Aberto')}</span>
       </div>
+      ${j.status!=='encerrado' && !fechadoPorTempo ? `<div class="mini-contagem" data-contagem="${id}">⏱️ ${fmtContagem(restante)}</div>` : ''}
     </div>`;
   }).join('');
 }
 
 /* ===================== DETALHE DO JOGO + PALPITAR ===================== */
+function renderContagemRegressiva(j, id){
+  const restante = tempoRestanteMs(j);
+  if(restante<=0) return '';
+  return `
+  <div class="card contagem-card">
+    <div class="contagem-aviso">⚠️ Para evitar fraudes, este bolão fechará automaticamente</div>
+    <div class="contagem-numero" data-contagem="${id}">${fmtContagem(restante)}</div>
+    <div class="contagem-sub">até a hora do jogo</div>
+  </div>`;
+}
+
 function renderDetalheJogo(id){
   const j = jogosCache[id];
   if(!j) return `<div class="empty">Jogo não encontrado.</div>`;
@@ -510,10 +572,12 @@ function renderDetalheJogo(id){
     </div>
     <div class="meta-row">
       <span class="valor">Aposta: ${formatBRL(j.valor)}</span>
-      <span>${fmtData(j.data)}</span>
+      <span>${fmtData(j.data)} ${j.hora||''}</span>
       <span class="badge ${j.status==='encerrado'?'encerrado':'aberto'}">${j.status==='encerrado'?'Encerrado':'Aberto'}</span>
     </div>
   </div>
+
+  ${j.status!=='encerrado' ? renderContagemRegressiva(j, id) : ''}
 
   <div class="card mesa-destaque">
     <div class="mesa-row">
@@ -533,7 +597,7 @@ function renderDetalheJogo(id){
 
   ${resultadoHtml}
 
-  ${j.status!=='encerrado' ? `
+  ${j.status!=='encerrado' && !jogoFechadoPorTempo(j) ? `
   <div class="card">
     <h3 style="margin-bottom:12px;font-size:1rem">📝 Dar palpite</h3>
     <div class="field">
@@ -553,6 +617,12 @@ function renderDetalheJogo(id){
       <span style="font-weight:700;font-size:.8rem">${j.timeB}</span>
     </div>
     <button class="btn btn-primary" id="btnEnviarPalpite">Confirmar palpite</button>
+  </div>` : ''}
+  ${j.status!=='encerrado' && jogoFechadoPorTempo(j) ? `
+  <div class="card" style="text-align:center;border:1.5px solid var(--vermelho)">
+    <div style="font-size:1.5rem">🔒</div>
+    <div style="font-weight:800;color:var(--vermelho);margin-top:4px">Apostas encerradas</div>
+    <div class="small-text">O horário do jogo chegou. Não é mais possível enviar novos palpites.</div>
   </div>` : ''}
 
   <div class="card">
@@ -714,6 +784,12 @@ function fecharPopupGanho(){
 }
 
 function enviarPalpite(){
+  const j = jogosCache[jogoSelecionado];
+  if(!j || j.status==='encerrado' || jogoFechadoPorTempo(j)){
+    toast('Esse bolão já fechou para novas apostas');
+    render();
+    return;
+  }
   const nome = document.getElementById('palpiteNome').value.trim();
   const telefone = document.getElementById('palpiteTelefone').value.trim();
   const placarA = document.getElementById('palpiteA').value;
@@ -859,6 +935,7 @@ function renderAdminNovoJogo(){
     <div class="field"><label>URL da imagem B (opcional — use se a bandeira automática não servir)</label><input type="text" id="novoImagemB" placeholder="https://..."></div>
     <div class="field"><label>Valor da aposta (R$)</label><input type="number" step="0.01" id="novoValor" placeholder="3.00"></div>
     <div class="field"><label>Data do jogo</label><input type="date" id="novoData"></div>
+    <div class="field"><label>Horário do jogo</label><input type="time" id="novoHora" value="16:00"></div>
     <button class="btn btn-primary" id="btnCriarJogo">Criar jogo</button>
   </div>
   <div class="card">
@@ -908,6 +985,7 @@ function criarJogo(){
   const imagemB = document.getElementById('novoImagemB').value.trim();
   const valor = parseFloat(document.getElementById('novoValor').value);
   const data = document.getElementById('novoData').value;
+  const hora = document.getElementById('novoHora').value || '00:00';
 
   if(!timeA || !timeB || !paisA || !paisB || !valor || !data){
     toast('Preencha todos os campos'); return;
@@ -915,7 +993,7 @@ function criarJogo(){
   db.ref('jogos').push({
     timeA, paisA, imagemA: imagemA || null,
     timeB, paisB, imagemB: imagemB || null,
-    valor, data,
+    valor, data, hora,
     status:'aberto', criadoEm: Date.now()
   }).then(()=>{
     toast('Jogo criado!');
@@ -1072,6 +1150,24 @@ function sortearGanhador(jogoId){
 
 /* ===================== INIT ===================== */
 render();
+
+/* Atualiza as contagens regressivas a cada segundo, sem re-renderizar a tela inteira
+   (evita perder o foco de inputs enquanto a pessoa digita o palpite) */
+setInterval(()=>{
+  let algumZerou = false;
+  document.querySelectorAll('[data-contagem]').forEach(el=>{
+    const jogoId = el.dataset.contagem;
+    const j = jogosCache[jogoId];
+    if(!j) return;
+    const restante = tempoRestanteMs(j);
+    if(restante<=0){
+      algumZerou = true;
+    } else {
+      el.textContent = el.classList.contains('mini-contagem') ? `⏱️ ${fmtContagem(restante)}` : fmtContagem(restante);
+    }
+  });
+  if(algumZerou) render(); // algum jogo acabou de fechar: re-renderiza pra travar o formulário
+}, 1000);
 </script>
 </body>
 </html>
