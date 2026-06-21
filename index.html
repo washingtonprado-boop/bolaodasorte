@@ -831,9 +831,13 @@ function mostrarPix(){
     </div>
     <p style="font-size:.8rem;color:var(--cinza)">Depois de pagar, envie o comprovante para o organizador confirmar. Você pode acompanhar o status em "Meus Palpites".</p>
     <p style="font-size:.78rem;color:var(--cinza);margin-top:8px">🎟️ Se ninguém acertar o palpite, o dinheiro será sorteado entre os participantes.</p>
-    <button class="btn btn-primary" id="btnVoltarAposPix" style="margin-top:14px">OK, entendi</button>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-secondary" id="btnOutroPalpite">Dar outro palpite neste jogo</button>
+      <button class="btn btn-primary" id="btnVoltarAposPix">OK, entendi</button>
+    </div>
   </div>`;
   document.getElementById('btnVoltarAposPix').onclick = ()=>{ jogoSelecionado=null; render(); };
+  document.getElementById('btnOutroPalpite').onclick = ()=>{ render(); };
 }
 
 /* ===================== MEUS PALPITES ===================== */
@@ -850,21 +854,31 @@ function renderMeusPalpites(){
 document.addEventListener('click', e=>{
   if(e.target.id==='btnBuscarPalpites'){
     const tel = document.getElementById('buscaTelefone').value.trim();
-    const resultados = Object.entries(palpitesCache).filter(([_,p])=>p.telefone===tel);
+    const resultados = Object.entries(palpitesCache)
+      .filter(([_,p])=>p.telefone===tel)
+      .sort((a,b)=>(b[1].criadoEm||0)-(a[1].criadoEm||0));
     const div = document.getElementById('resultadoBusca');
     if(resultados.length===0){
       div.innerHTML = `<div class="empty">Nenhum palpite encontrado com esse telefone.</div>`;
       return;
     }
-    div.innerHTML = resultados.map(([id,p])=>{
+    // Conta quantos palpites a pessoa tem em cada jogo, pra mostrar "palpite 2 de 3" etc
+    const contagemPorJogo = {};
+    resultados.forEach(([_,p])=>{ contagemPorJogo[p.jogoId] = (contagemPorJogo[p.jogoId]||0)+1; });
+    const ordemPorJogo = {};
+    div.innerHTML = `<div class="small-text" style="margin-bottom:10px">${resultados.length} palpite(s) encontrado(s)</div>` +
+      resultados.map(([id,p])=>{
       const j = jogosCache[p.jogoId];
       if(!j) return '';
+      ordemPorJogo[p.jogoId] = (ordemPorJogo[p.jogoId]||0)+1;
+      const totalNoJogo = contagemPorJogo[p.jogoId];
       return `
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <strong>${j.timeA} x ${j.timeB}</strong>
           <span class="${p.pago?'status-pago':'status-pendente'}">${p.pago?'✓ PAGO':'⏳ PENDENTE'}</span>
         </div>
+        ${totalNoJogo>1 ? `<div class="small-text">Palpite ${ordemPorJogo[p.jogoId]} de ${totalNoJogo} que você deu neste jogo</div>` : ''}
         <div class="small-text">Seu palpite: ${p.placarA} x ${p.placarB}</div>
         ${j.status==='encerrado' && j.placarA!=null ? `<div class="small-text">Resultado real: ${j.placarA} x ${j.placarB}</div>` : ''}
         ${!p.pago ? `<div class="pix-box" style="margin-top:10px;text-align:center">
